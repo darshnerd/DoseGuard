@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     
     rxnav_base: str = "https://rxnav.nlm.nih.gov/REST"
     rxnav_timeout: float = 5.0
+    
+    database_url: str = "sqlite:///./doseguard.db"
 
 
 @lru_cache
