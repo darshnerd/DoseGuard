@@ -5,6 +5,7 @@ import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlmodel import Session
 
+from app.config import get_settings
 from app.db import get_session
 from app.schemas.interaction import InteractionResult
 from app.schemas.scan import ScanResponse
@@ -20,6 +21,10 @@ async def scan(
     session: Annotated[Session, Depends(get_session)],
 ):
     raw = await image.read()
+    max_bytes = get_settings().max_upload_mb * 1024 * 1024
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=413, detail="Image too large.")
+
     buffer = np.frombuffer(raw, np.uint8)
     decoded = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
     if decoded is None:
@@ -43,4 +48,3 @@ async def scan(
         conflict_found=bool(interactions),
         interactions=interactions,
     )
-    
