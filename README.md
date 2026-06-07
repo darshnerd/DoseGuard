@@ -1,0 +1,1 @@
+Meditation scanner + interaction checker
