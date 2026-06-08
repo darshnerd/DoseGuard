@@ -7,6 +7,8 @@ from sqlmodel import Session
 
 from app.config import get_settings
 from app.db import get_session
+from app.deps import get_current_user
+from app.models import ScanHistory, User
 from app.schemas.interaction import InteractionResult
 from app.schemas.scan import ScanResponse
 from app.services.interactions import check_pairs
@@ -18,6 +20,7 @@ router = APIRouter(tags=["scan"])
 @router.post("/scan", response_model=ScanResponse)
 async def scan(
     image: Annotated[UploadFile, File()],
+    user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
     raw = await image.read()
@@ -42,6 +45,17 @@ async def scan(
         )
         for i in found
     ]
+
+    session.add(
+        ScanHistory(
+            user_id=user.id,
+            drugs=ingredients,
+            conflict_found=bool(interactions),
+            interaction_count=len(interactions),
+        )
+    )
+    session.commit()
+    
     return ScanResponse(
         detected=detected,
         ingredients=ingredients,

@@ -20,6 +20,11 @@ class RxNormClient:
         data = await self._get("/approximateTerm.json", {"term": term, "maxEntries": 1})
         cads = data.get("approximateGroup", {}).get("candidate", [])
         return cads[0]["rxcui"] if cads else None
+
+    async def _exact_rxcui(self, name):
+        data = await self._get("/rxcui.json", {"name": name})
+        ids = data.get("idGroup", {}).get("rxnormId", [])
+        return ids[0] if ids else None
     
     async def _properties(self, rxcui):
         data = await self._get(f"/rxcui/{rxcui}/properties.json", {})

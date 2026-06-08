@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.logging import set_logging
 from app.ratelimit import limiter
-from app.routers import auth, drugs, health, interactions, medications, scan
+from app.routers import auth, drugs, health, interactions, medications, profile, scan, scans
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -50,7 +50,9 @@ def create_app():
     app.include_router(drugs.router)
     app.include_router(interactions.router)
     app.include_router(scan.router)
+    app.include_router(scans.router)
     app.include_router(medications.router)
+    app.include_router(profile.router)
     return app
 
 
