@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.db import get_session
 from app.deps import get_current_user
 from app.models import ScanHistory, User
+from app.schemas.drug import ResolvedDrug
 from app.schemas.interaction import InteractionResult
 from app.schemas.scan import ScanResponse
 from app.services.interactions import check_pairs
@@ -33,8 +34,18 @@ async def scan(
     if decoded is None:
         raise HTTPException(status_code=400, detail="Could not read image.")
 
-    detected = await detect_drugs(decoded)
-    ingredients = [d.ingredient_name.lower() for d in detected if d.ingredient_name]
+    ingredients = await detect_drugs(decoded)
+    detected = [
+        ResolvedDrug(
+            query=name,
+            matched=True,
+            rxcui=None,
+            name=name,
+            ingredient_rxcui=None,
+            ingredient_name=name,
+        )
+        for name in ingredients
+    ]
     found = check_pairs(session, ingredients)
     interactions = [
         InteractionResult(
