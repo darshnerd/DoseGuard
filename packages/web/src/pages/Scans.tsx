@@ -1,13 +1,8 @@
 import { Alert, Button, Card, Chip, Input, Modal, Table } from "@heroui/react";
+import { History, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, type Interaction, type ScanRecord } from "../api";
-
-const SEVERITY_COLOR: Record<string, "danger" | "warning" | "accent"> = {
-  contraindicated: "danger",
-  severe: "danger",
-  moderate: "warning",
-  low: "accent",
-};
+import { FadeItem, PageHeader, severityColor } from "../components/ui";
 
 function EditModal({ scan }: { scan: ScanRecord }) {
   const [drugs, setDrugs] = useState<string[]>(scan.drugs);
@@ -37,7 +32,9 @@ function EditModal({ scan }: { scan: ScanRecord }) {
 
   return (
     <Modal>
-      <Button size="sm" variant="secondary">Edit & re-check</Button>
+      <Button size="sm" variant="secondary">
+        <RotateCw className="mr-1 size-4" /> Edit & re-check
+      </Button>
       <Modal.Backdrop>
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-[520px]">
@@ -52,18 +49,17 @@ function EditModal({ scan }: { scan: ScanRecord }) {
                   {drugs.map((d) => (
                     <Chip key={d}>
                       {d}
-                      <button className="ml-1" onClick={() => remove(d)}>✕</button>
+                      <button className="ml-1" onClick={() => remove(d)}>
+                        ✕
+                      </button>
                     </Chip>
                   ))}
                 </div>
                 <form className="flex gap-2" onSubmit={add}>
-                  <Input
-                    fullWidth
-                    placeholder="Add a drug"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                  <Button type="submit" variant="secondary">Add</Button>
+                  <Input fullWidth placeholder="Add a drug" value={name} onChange={(e) => setName(e.target.value)} />
+                  <Button type="submit" variant="secondary">
+                    Add
+                  </Button>
                 </form>
                 <Button onPress={recheck}>Re-check interactions</Button>
 
@@ -78,10 +74,12 @@ function EditModal({ scan }: { scan: ScanRecord }) {
                   ) : (
                     <div className="flex flex-col gap-2">
                       {results.map((i, idx) => (
-                        <Alert key={idx} status={SEVERITY_COLOR[i.severity] ?? "accent"}>
+                        <Alert key={idx} status={severityColor(i.severity)}>
                           <Alert.Indicator />
                           <Alert.Content>
-                            <Alert.Title>{i.ingredient_a} + {i.ingredient_b}</Alert.Title>
+                            <Alert.Title>
+                              {i.ingredient_a} + {i.ingredient_b}
+                            </Alert.Title>
                             <Alert.Description>{i.description}</Alert.Description>
                           </Alert.Content>
                         </Alert>
@@ -92,7 +90,9 @@ function EditModal({ scan }: { scan: ScanRecord }) {
               </div>
             </Modal.Body>
             <Modal.Footer>
-              <Button slot="close" variant="tertiary">Close</Button>
+              <Button slot="close" variant="tertiary">
+                Close
+              </Button>
             </Modal.Footer>
           </Modal.Dialog>
         </Modal.Container>
@@ -124,50 +124,52 @@ export default function Scans() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Scan history</h1>
-      <Card>
-        <Card.Content>
-          {scans.length === 0 ? (
-            <p className="text-gray-500">No scans yet. Scan a label to see it here.</p>
-          ) : (
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="Scan history" className="min-w-[640px]">
-                  <Table.Header>
-                    <Table.Column isRowHeader>Date</Table.Column>
-                    <Table.Column>Extracted drugs</Table.Column>
-                    <Table.Column>Interactions</Table.Column>
-                    <Table.Column>Status</Table.Column>
-                    <Table.Column>Actions</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {scans.map((s) => (
-                      <Table.Row key={s.id}>
-                        <Table.Cell>{new Date(s.created_at).toLocaleString()}</Table.Cell>
-                        <Table.Cell>{s.drugs.join(", ") || "—"}</Table.Cell>
-                        <Table.Cell>{s.interaction_count}</Table.Cell>
-                        <Table.Cell>
-                          <Chip color={s.conflict_found ? "danger" : "success"}>
-                            {s.conflict_found ? "At risk" : "OK"}
-                          </Chip>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="flex gap-2">
-                            <EditModal scan={s} />
-                            <Button size="sm" variant="danger" onPress={() => remove(s.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
-          )}
-        </Card.Content>
-      </Card>
+      <PageHeader icon={History} title="Scan history" subtitle="Your previous label scans." />
+      <FadeItem>
+        <Card>
+          <Card.Content>
+            {scans.length === 0 ? (
+              <p className="text-gray-500">No scans yet. Scan a label to see it here.</p>
+            ) : (
+              <Table>
+                <Table.ScrollContainer>
+                  <Table.Content aria-label="Scan history" className="min-w-[640px]">
+                    <Table.Header>
+                      <Table.Column isRowHeader>Date</Table.Column>
+                      <Table.Column>Extracted drugs</Table.Column>
+                      <Table.Column>Interactions</Table.Column>
+                      <Table.Column>Status</Table.Column>
+                      <Table.Column>Actions</Table.Column>
+                    </Table.Header>
+                    <Table.Body>
+                      {scans.map((s) => (
+                        <Table.Row key={s.id}>
+                          <Table.Cell>{new Date(s.created_at).toLocaleString()}</Table.Cell>
+                          <Table.Cell>{s.drugs.join(", ") || "—"}</Table.Cell>
+                          <Table.Cell>{s.interaction_count}</Table.Cell>
+                          <Table.Cell>
+                            <Chip color={s.conflict_found ? "danger" : "success"}>
+                              {s.conflict_found ? "At risk" : "OK"}
+                            </Chip>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex gap-2">
+                              <EditModal scan={s} />
+                              <Button size="sm" variant="danger" onPress={() => remove(s.id)}>
+                                <Trash2 className="mr-1 size-4" /> Delete
+                              </Button>
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Content>
+                </Table.ScrollContainer>
+              </Table>
+            )}
+          </Card.Content>
+        </Card>
+      </FadeItem>
       {error && <p className="text-red-600">{error}</p>}
     </div>
   );

@@ -16,11 +16,15 @@ export interface Interaction {
   description: string;
 }
 
+export interface Ingredient {
+  ingredient: string;
+  rxcui: string | null;
+}
+
 export interface Medication {
   id: number;
   name: string;
-  ingredient: string | null;
-  rxcui: string | null;
+  ingredients: Ingredient[];
 }
 
 export interface CheckResponse {
@@ -51,6 +55,39 @@ export interface Profile {
   full_name: string | null;
   age: number | null;
   sex: string | null;
+}
+
+export type Slot = "morning" | "afternoon" | "evening" | "night";
+export type DoseStatus = "taken" | "skipped" | "overdue" | "upcoming";
+
+export interface TodayItem {
+  medication_id: number;
+  name: string;
+  status: DoseStatus;
+}
+
+export interface TodaySlot {
+  slot: Slot;
+  items: TodayItem[];
+  warnings: string[];
+}
+
+export interface TodayResponse {
+  date: string;
+  slots: TodaySlot[];
+  adherence: number;
+}
+
+export interface ScheduleOut {
+  medication_id: number;
+  name: string;
+  slots: Slot[];
+}
+
+export interface Adherence {
+  percent: number;
+  taken: number;
+  expected: number;
 }
 
 function setTokens(access: string, refresh: string) {
@@ -143,11 +180,11 @@ export const api = {
     return res.json();
   },
 
-  async addMedication(name: string): Promise<Medication> {
+  async addMedication(name: string, drugs?: string[]): Promise<Medication> {
     const res = await request("/medications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, drugs }),
     });
     if (!res.ok) throw new Error(await detail(res, "Failed to add medication"));
     return res.json();
@@ -206,6 +243,44 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(await detail(res, "Failed to update profile"));
+    return res.json();
+  },
+
+  async getToday(): Promise<TodayResponse> {
+    const res = await request("/tracking/today");
+    if (!res.ok) throw new Error(await detail(res, "Failed to load today"));
+    return res.json();
+  },
+
+  async getSchedule(): Promise<ScheduleOut[]> {
+    const res = await request("/tracking/schedule");
+    if (!res.ok) throw new Error(await detail(res, "Failed to load schedule"));
+    return res.json();
+  },
+
+  async setSchedule(medId: number, slots: Slot[]): Promise<ScheduleOut> {
+    const res = await request(`/tracking/schedule/${medId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slots }),
+    });
+    if (!res.ok) throw new Error(await detail(res, "Failed to save schedule"));
+    return res.json();
+  },
+
+  async logDose(medId: number, slot: Slot, status: "taken" | "skipped") {
+    const res = await request("/tracking/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ medication_id: medId, slot, status }),
+    });
+    if (!res.ok) throw new Error(await detail(res, "Failed to log dose"));
+    return res.json();
+  },
+
+  async getAdherence(): Promise<Adherence> {
+    const res = await request("/tracking/adherence");
+    if (!res.ok) throw new Error(await detail(res, "Failed to load adherence"));
     return res.json();
   },
 

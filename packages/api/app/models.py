@@ -26,9 +26,12 @@ class Medication(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(index=True, foreign_key="user.id")
     name: str
-    ingredient: str | None = None
-    rxcui: str | None = None
 
+class MedicationIngredient(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    medication_id: int = Field(index=True, foreign_key="medication.id")
+    ingredient: str = Field(index=True)
+    rxcui: str | None = None
 
 class ScanHistory(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -36,4 +39,20 @@ class ScanHistory(SQLModel, table=True):
     drugs: list[str] = Field(default_factory=list, sa_column = Column(JSON))
     conflict_found: bool = False
     interaction_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+class DoseSchedule(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    medication_id: int = Field(index=True, foreign_key="medication.id")
+    slot: str
+
+
+class DoseLog(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, foreign_key="user.id")
+    medication_id: int = Field(index=True, foreign_key="medication.id")
+    slot: str
+    status: str
+    taken_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

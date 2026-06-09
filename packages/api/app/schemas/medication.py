@@ -1,8 +1,16 @@
 from pydantic import BaseModel, ConfigDict
 
 
+class IngredientOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ingredient: str
+    rxcui: str | None
+
+
 class MedicationCreate(BaseModel):
     name: str
+    drugs: list[str] | None = None
 
 
 class MedicationOut(BaseModel):
@@ -10,5 +18,4 @@ class MedicationOut(BaseModel):
 
     id: int
     name: str
-    ingredient: str | None
-    rxcui: str | None
+    ingredients: list[IngredientOut] = []

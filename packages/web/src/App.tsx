@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Scan from "./pages/Scan";
 import Scans from "./pages/Scans";
 import Profile from "./pages/Profile";
+import Today from "./pages/Today";
 
 export default function App() {
   const { loggedIn } = useAuth();
@@ -26,6 +27,7 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/today" element={<Today />} />
         <Route path="/medications" element={<Medications />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/scans" element={<Scans />} />

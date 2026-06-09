@@ -1,14 +1,28 @@
-import { Alert, Button, Card, Chip } from "@heroui/react";
+import { Alert, Card, Chip, Skeleton } from "@heroui/react";
+import { motion } from "framer-motion";
+import { ScanLine, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { api, type ScanResponse } from "../api";
 import CameraCapture from "../components/CameraCapture";
+import { Button } from "@heroui/react";
+import { FadeItem, PageHeader, SeverityChip, severityColor } from "../components/ui";
 
-const SEVERITY_COLOR: Record<string, "danger" | "warning" | "accent"> = {
-  contraindicated: "danger",
-  severe: "danger",
-  moderate: "warning",
-  low: "accent",
-};
+function ResultSkeleton() {
+  return (
+    <Card>
+      <Card.Content>
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-5 w-32" />
+          <div className="flex gap-2">
+            <Skeleton className="h-7 w-20 rounded-full" />
+            <Skeleton className="h-7 w-24 rounded-full" />
+          </div>
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      </Card.Content>
+    </Card>
+  );
+}
 
 export default function Scan() {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,31 +49,36 @@ export default function Scan() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Scan a label</h1>
+      <PageHeader icon={ScanLine} title="Scan a label" subtitle="Read a medicine label with your camera." />
 
-      <Card>
-        <Card.Header>
-          <Card.Title>Read a medicine label</Card.Title>
-          <Card.Description>Use your camera or upload a photo.</Card.Description>
-        </Card.Header>
-        <Card.Content>
-          <div className="flex flex-col gap-4">
-            <CameraCapture onCapture={handleScan} disabled={loading} />
-            <span className="text-sm text-gray-500">or</span>
-            <Button
-              variant="secondary"
-              isPending={loading}
-              onPress={() => fileRef.current?.click()}
-            >
-              {loading ? "Reading…" : "Upload a photo"}
-            </Button>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-          </div>
-        </Card.Content>
-      </Card>
+      <FadeItem>
+        <Card>
+          <Card.Header>
+            <Card.Title>Read a medicine label</Card.Title>
+            <Card.Description>Use your camera or upload a photo.</Card.Description>
+          </Card.Header>
+          <Card.Content>
+            <div className="flex flex-col gap-4">
+              <CameraCapture onCapture={handleScan} disabled={loading} />
+              <span className="text-sm text-gray-500">or</span>
+              <Button variant="secondary" isPending={loading} onPress={() => fileRef.current?.click()}>
+                <Upload className="mr-1 size-4" />
+                {loading ? "Reading…" : "Upload a photo"}
+              </Button>
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+            </div>
+          </Card.Content>
+        </Card>
+      </FadeItem>
 
-      {result && (
-        <>
+      {loading && <ResultSkeleton />}
+
+      {!loading && result && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-6"
+        >
           <Card>
             <Card.Header>
               <Card.Title>Detected</Card.Title>
@@ -92,11 +111,12 @@ export default function Scan() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {result.interactions.map((i, idx) => (
-                    <Alert key={idx} status={SEVERITY_COLOR[i.severity] ?? "accent"}>
+                    <Alert key={idx} status={severityColor(i.severity)}>
                       <Alert.Indicator />
                       <Alert.Content>
-                        <Alert.Title>
+                        <Alert.Title className="flex items-center gap-2">
                           {i.ingredient_a} + {i.ingredient_b}
+                          <SeverityChip severity={i.severity} />
                         </Alert.Title>
                         <Alert.Description>{i.description}</Alert.Description>
                       </Alert.Content>
@@ -106,7 +126,7 @@ export default function Scan() {
               )}
             </Card.Content>
           </Card>
-        </>
+        </motion.div>
       )}
 
       {error && (

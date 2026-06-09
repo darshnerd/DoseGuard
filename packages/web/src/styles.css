@@ -1,2 +1,36 @@
 @import "tailwindcss";
 @import "@heroui/styles";
+
+/* DoseGuard design tokens (light theme) */
+@theme {
+  --color-brand: #2563eb;        /* blue-600 */
+  --color-brand-soft: #dbeafe;   /* blue-100 */
+  --color-safe: #10b981;         /* emerald-500 */
+  --color-risk: #ef4444;         /* red-500 */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+@keyframes success-flash {
+  0%  { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  50% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.animate-success-flash { animation: success-flash 0.7s ease-out; }
+
+.bg-brand-gradient {
+  background-image: radial-gradient(at 20% 20%, #3b82f6 0px, transparent 55%),
+                    radial-gradient(at 80% 0%, #6366f1 0px, transparent 50%),
+                    radial-gradient(at 60% 90%, #0ea5e9 0px, transparent 55%),
+                    linear-gradient(135deg, #1e3a8a, #1d4ed8);
+}
