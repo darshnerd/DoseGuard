@@ -39,3 +39,8 @@ class AdherenceOut(BaseModel):
     percent: float
     taken: int
     expected: int
+
+class DayStat(BaseModel):
+    date: str
+    expected: int
+    taken: int

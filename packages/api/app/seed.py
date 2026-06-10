@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 
 from app.db import engine, init_db
 from app.models import Interaction
+from app.normalize import normalize
 
 CURATED = [
     ("warfarin", "aspirin", "severe", "Significantly increased bleeding risk."),
@@ -18,20 +19,21 @@ CURATED = [
 def seed():
     init_db()
     with Session(engine) as session:
-        for a, b, severity, description in CURATED:
-            a, b = sorted([a.lower(), b.lower()])
+        for raw_a, raw_b, severity, description in CURATED:
+            a, b = sorted((normalize(raw_a), normalize(raw_b)))
             exists = session.exec(
                 select(Interaction).where(
-                    (Interaction.ingredient_a == a) & (Interaction.ingredient_b == b)
+                    Interaction.a_norm == a, Interaction.b_norm == b
                 )
             ).first()
             if not exists:
                 session.add(
                     Interaction(
-                        ingredient_a=a,
-                        ingredient_b=b,
+                        a_norm=a,
+                        b_norm=b,
                         severity=severity,
                         description=description,
+                        sources="seed",
                     )
                 )
         session.commit()
@@ -40,3 +42,4 @@ def seed():
 if __name__ == "__main__":
     seed()
     print(f"Seeded {len(CURATED)} interactions.")
+    

@@ -9,6 +9,7 @@ import Scan from "./pages/Scan";
 import Scans from "./pages/Scans";
 import Profile from "./pages/Profile";
 import Today from "./pages/Today";
+import CalendarPage from "./pages/Calendar";
 
 export default function App() {
   const { loggedIn } = useAuth();
@@ -28,10 +29,11 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/today" element={<Today />} />
+        <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/medications" element={<Medications />} />
         <Route path="/scan" element={<Scan />} />
         <Route path="/scans" element={<Scans />} />
-         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

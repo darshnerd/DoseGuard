@@ -21,10 +21,26 @@ export interface Ingredient {
   rxcui: string | null;
 }
 
+export interface DrugHit {
+  name: string;
+  normalized: string;
+  kind: string;
+  manufacturer?: string | null;
+  score?: number;
+}
+
 export interface Medication {
   id: number;
   name: string;
+  start_date: string;
+  duration_days: number | null;
   ingredients: Ingredient[];
+}
+
+export interface DayStat {
+  date: string;
+  expected: number;
+  taken: number;
 }
 
 export interface CheckResponse {
@@ -180,13 +196,32 @@ export const api = {
     return res.json();
   },
 
-  async addMedication(name: string, drugs?: string[]): Promise<Medication> {
+  async addMedication(name: string, drugs?: string[], durationDays?: number | null): Promise<Medication> {
     const res = await request("/medications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, drugs }),
+      body: JSON.stringify({ name, drugs, duration_days: durationDays ?? null }),
     });
     if (!res.ok) throw new Error(await detail(res, "Failed to add medication"));
+    return res.json();
+  },
+
+  async updateMedication(
+    id: number,
+    data: { name?: string; duration_days?: number | null }
+  ): Promise<Medication> {
+    const res = await request(`/medications/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await detail(res, "Failed to update medication"));
+    return res.json();
+  },
+
+  async getHistory(days = 30): Promise<DayStat[]> {
+    const res = await request(`/tracking/history?days=${days}`);
+    if (!res.ok) throw new Error(await detail(res, "Failed to load history"));
     return res.json();
   },
 
@@ -281,6 +316,12 @@ export const api = {
   async getAdherence(): Promise<Adherence> {
     const res = await request("/tracking/adherence");
     if (!res.ok) throw new Error(await detail(res, "Failed to load adherence"));
+    return res.json();
+  },
+
+  async searchDrugs(q: string): Promise<DrugHit[]> {
+    const res = await request(`/drugs/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
     return res.json();
   },
 

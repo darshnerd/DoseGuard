@@ -1,6 +1,7 @@
 import { Avatar, Button, Drawer } from "@heroui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  CalendarCheck,
   CalendarDays,
   History,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import { useAuth } from "../auth";
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/today", label: "Today", icon: CalendarDays },
+  { to: "/calendar", label: "Calendar", icon: CalendarCheck },
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/medications", label: "Medications", icon: Pill },
   { to: "/scan", label: "Scan", icon: ScanLine },
@@ -134,6 +136,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
+              className="mx-auto w-full max-w-5xl"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}

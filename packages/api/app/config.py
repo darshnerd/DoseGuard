@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     refresh_token_days: int = 7
     max_upload_mb: int = 5
 
+    pubchem_live: bool = True
+
     @model_validator(mode="after")
     def _require_secret_in_prod(self):
         if self.environment == "production":

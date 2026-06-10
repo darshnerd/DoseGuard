@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,7 +8,7 @@ from app.db import get_session
 from app.deps import get_current_user
 from app.models import DoseSchedule, Medication, MedicationIngredient, User
 from app.schemas.interaction import InteractionCheckResponse, InteractionResult
-from app.schemas.medication import IngredientOut, MedicationCreate, MedicationOut
+from app.schemas.medication import IngredientOut, MedicationCreate, MedicationOut, MedicationUpdate
 from app.services.interactions import check_pairs
 from app.services.rxnorm import RxNormClient
 
@@ -21,8 +22,17 @@ def _med_out(session: Session, med: Medication) -> MedicationOut:
     return MedicationOut(
         id=med.id,
         name=med.name,
+        start_date=med.start_date,
+        duration_days=med.duration_days,
         ingredients=[IngredientOut(ingredient=r.ingredient, rxcui=r.rxcui) for r in rows],
     )
+
+
+def _owned(session: Session, user: User, med_id: int) -> Medication:
+    med = session.get(Medication, med_id)
+    if not med or med.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Medication not found.")
+    return med
 
 
 @router.post("", response_model=MedicationOut, status_code=status.HTTP_201_CREATED)
@@ -31,7 +41,12 @@ async def add_medication(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    med = Medication(user_id=user.id, name=req.name)
+    med = Medication(
+        user_id=user.id,
+        name=req.name,
+        start_date=req.start_date or datetime.now(UTC).date(),
+        duration_days=req.duration_days,
+    )
     session.add(med)
     session.commit()
     session.refresh(med)
@@ -70,16 +85,34 @@ def list_medications(
     return [_med_out(session, m) for m in meds]
 
 
+@router.patch("/{med_id}", response_model=MedicationOut)
+def update_medication(
+    med_id: int,
+    req: MedicationUpdate,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    med = _owned(session, user, med_id)
+    data = req.model_dump(exclude_unset=True)
+    if "name" in data and data["name"]:
+        med.name = data["name"]
+    if "duration_days" in data:
+        med.duration_days = data["duration_days"]
+    if "start_date" in data and data["start_date"]:
+        med.start_date = data["start_date"]
+    session.add(med)
+    session.commit()
+    session.refresh(med)
+    return _med_out(session, med)
+
+
 @router.delete("/{med_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_medication(
     med_id: int,
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    med = session.get(Medication, med_id)
-    if not med or med.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Medication not found.")
-    # Clean up salts and schedules tied to this med (dose logs kept as history).
+    med = _owned(session, user, med_id)
     for row in session.exec(
         select(MedicationIngredient).where(MedicationIngredient.medication_id == med_id)
     ).all():
@@ -120,4 +153,3 @@ def check_my_medications(
         conflict_found=bool(results),
         interactions=results,
     )
-    

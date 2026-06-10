@@ -1,9 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlmodel import select
 
 from app.models import DoseLog, DoseSchedule, Medication, MedicationIngredient
-from app.schemas.tracking import AdherenceOut, TodayItem, TodayResponse, TodaySlot
+from app.schemas.tracking import AdherenceOut, DayStat, TodayItem, TodayResponse, TodaySlot
 from app.services.interactions import check_pairs
 
 SLOT_ORDER = ["morning", "afternoon", "evening", "night"]
@@ -13,6 +13,17 @@ SLOT_CUTOFF = {"morning": 11, "afternoon": 16, "evening": 21, "night": 24}
 def is_valid_slot(slot: str) -> bool:
     return slot in SLOT_CUTOFF
 
+def _course_end(med: Medication) -> date | None:
+    if med.duration_days is None:
+        return None
+    return med.start_date + timedelta(days=med.duration_days - 1)
+
+
+def active_on(med: Medication, day: date) -> bool:
+    if day < med.start_date:
+        return False
+    end = _course_end(med)
+    return end is None or day <= end
 
 def _day_window(now: datetime) -> tuple[datetime, datetime]:
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -20,6 +31,7 @@ def _day_window(now: datetime) -> tuple[datetime, datetime]:
 
 
 def build_today(session, user, now: datetime) -> TodayResponse:
+    today = now.date()
     schedules = session.exec(
         select(DoseSchedule).where(DoseSchedule.user_id == user.id)
     ).all()
@@ -32,12 +44,11 @@ def build_today(session, user, now: datetime) -> TodayResponse:
 
     ings_by_med: dict[int, list[str]] = {}
     if meds:
-        ing_rows = session.exec(
+        for r in session.exec(
             select(MedicationIngredient).where(
                 MedicationIngredient.medication_id.in_(list(meds.keys()))
             )
-        ).all()
-        for r in ing_rows:
+        ).all():
             ings_by_med.setdefault(r.medication_id, []).append(r.ingredient)
 
     day_start, day_end = _day_window(now)
@@ -54,12 +65,15 @@ def build_today(session, user, now: datetime) -> TodayResponse:
 
     slots_out: list[TodaySlot] = []
     for slot in SLOT_ORDER:
-        slot_scheds = [s for s in schedules if s.slot == slot]
+        # Only schedules whose med's course is active today appear.
+        slot_scheds = [
+            s
+            for s in schedules
+            if s.slot == slot and meds.get(s.medication_id) and active_on(meds[s.medication_id], today)
+        ]
         items: list[TodayItem] = []
         for s in slot_scheds:
-            med = meds.get(s.medication_id)
-            if not med:
-                continue
+            med = meds[s.medication_id]
             log = log_by_key.get((s.medication_id, slot))
             if log:
                 status = log.status
@@ -69,7 +83,6 @@ def build_today(session, user, now: datetime) -> TodayResponse:
                 status = "upcoming"
             items.append(TodayItem(medication_id=med.id, name=med.name, status=status))
 
-        # DoseGuard twist: flag interactions across the salts of meds in this slot.
         ingredients = [
             ing for s in slot_scheds for ing in ings_by_med.get(s.medication_id, [])
         ]
@@ -86,26 +99,74 @@ def build_today(session, user, now: datetime) -> TodayResponse:
         adherence=adherence.percent,
     )
 
+def _window_days(now: datetime, days: int) -> list[date]:
+    today = now.date()
+    return [today - timedelta(days=d) for d in range(days - 1, -1, -1)]
 
 def compute_adherence(session, user, days: int = 7, now: datetime | None = None) -> AdherenceOut:
     now = now or datetime.now(UTC)
-    schedule_count = len(
-        session.exec(
-            select(DoseSchedule).where(DoseSchedule.user_id == user.id)
-        ).all()
-    )
-    expected = schedule_count * days
+    window = _window_days(now, days)
+    schedules = session.exec(
+        select(DoseSchedule).where(DoseSchedule.user_id == user.id)
+    ).all()
+    meds = {
+        m.id: m
+        for m in session.exec(select(Medication).where(Medication.user_id == user.id)).all()
+    }
+
+    expected = 0
+    for s in schedules:
+        med = meds.get(s.medication_id)
+        if not med:
+            continue
+        expected += sum(1 for day in window if active_on(med, day))
+
     if expected == 0:
         return AdherenceOut(percent=0, taken=0, expected=0)
 
-    since = now - timedelta(days=days)
+    window_start = datetime.combine(window[0], datetime.min.time(), tzinfo=UTC)
     taken = len(
         session.exec(
             select(DoseLog).where(
                 DoseLog.user_id == user.id,
                 DoseLog.status == "taken",
-                DoseLog.taken_at >= since,
+                DoseLog.taken_at >= window_start,
             )
         ).all()
     )
     return AdherenceOut(percent=round(taken / expected * 100), taken=taken, expected=expected)
+
+
+def daily_history(session, user, days: int = 30, now: datetime | None = None) -> list[DayStat]:
+    now = now or datetime.now(UTC)
+    window = _window_days(now, days)
+    schedules = session.exec(
+        select(DoseSchedule).where(DoseSchedule.user_id == user.id)
+    ).all()
+    meds = {
+        m.id: m
+        for m in session.exec(select(Medication).where(Medication.user_id == user.id)).all()
+    }
+
+    window_start = datetime.combine(window[0], datetime.min.time(), tzinfo=UTC)
+    logs = session.exec(
+        select(DoseLog).where(
+            DoseLog.user_id == user.id,
+            DoseLog.status == "taken",
+            DoseLog.taken_at >= window_start,
+        )
+    ).all()
+    taken_by_day: dict[date, int] = {}
+    for log in logs:
+        d = log.taken_at.date()
+        taken_by_day[d] = taken_by_day.get(d, 0) + 1
+
+    out: list[DayStat] = []
+    for day in window:
+        expected = sum(
+            1
+            for s in schedules
+            if meds.get(s.medication_id) and active_on(meds[s.medication_id], day)
+        )
+        out.append(DayStat(date=day.isoformat(), expected=expected, taken=taken_by_day.get(day, 0)))
+    return out

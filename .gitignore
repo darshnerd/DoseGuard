@@ -15,5 +15,12 @@ dist/
 
 # OS
 .DS_Store
+
+# SQLite (generated at runtime — never commit)
+*.db
+*.db-shm
+*.db-wal
 doseguard.db
 app/doseguard.db
+app/api/data/*
+packages/api/app/data/

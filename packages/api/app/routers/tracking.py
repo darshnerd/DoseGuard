@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.db import get_session
@@ -9,12 +9,13 @@ from app.deps import get_current_user
 from app.models import DoseLog, DoseSchedule, Medication, User
 from app.schemas.tracking import (
     AdherenceOut,
+    DayStat,
     LogCreate,
     ScheduleOut,
     ScheduleUpdate,
     TodayResponse,
 )
-from app.services.tracking import build_today, compute_adherence, is_valid_slot
+from app.services.tracking import build_today, compute_adherence, daily_history, is_valid_slot
 
 router = APIRouter(prefix="/tracking", tags=["tracking"])
 
@@ -129,8 +130,17 @@ def delete_log(
 
 @router.get("/adherence", response_model=AdherenceOut)
 def get_adherence(
-    user: Annotated[User, Depends(get_current_user)],
-    session: Annotated[Session, Depends(get_session)],
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+    user: Annotated[User, Depends(get_current_user)] = None,
+    session: Annotated[Session, Depends(get_session)] = None,
 ):
-    return compute_adherence(session, user)
-    
+    return compute_adherence(session, user, days=days)
+
+
+@router.get("/history", response_model=list[DayStat])
+def get_history(
+    days: Annotated[int, Query(ge=1, le=90)] = 30,
+    user: Annotated[User, Depends(get_current_user)] = None,
+    session: Annotated[Session, Depends(get_session)] = None,
+):
+    return daily_history(session, user, days=days)

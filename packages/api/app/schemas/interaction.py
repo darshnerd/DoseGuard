@@ -9,7 +9,9 @@ class InteractionResult(BaseModel):
     ingredient_a: str
     ingredient_b: str
     severity: str
-    description: str
+    description: str | None = None
+    mechanism: str | None = None
+    source: str | None = None
 
 
 class InteractionCheckResponse(BaseModel):
