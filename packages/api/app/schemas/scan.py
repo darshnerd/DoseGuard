@@ -21,3 +21,6 @@ class ScanRecordOut(BaseModel):
     conflict_found: bool
     interaction_count: int
     created_at: datetime
+
+class ScanUpdate(BaseModel):
+    drugs: list[str]

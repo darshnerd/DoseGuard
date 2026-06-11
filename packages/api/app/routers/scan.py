@@ -34,7 +34,7 @@ async def scan(
     if decoded is None:
         raise HTTPException(status_code=400, detail="Could not read image.")
 
-    ingredients = await detect_drugs(decoded)
+    ingredients = await detect_drugs(session, decoded)
     detected = [
         ResolvedDrug(
             query=name,
@@ -49,10 +49,12 @@ async def scan(
     found = check_pairs(session, ingredients)
     interactions = [
         InteractionResult(
-            ingredient_a=i.ingredient_a,
-            ingredient_b=i.ingredient_b,
+            ingredient_a=i.a_norm,
+            ingredient_b=i.b_norm,
             severity=i.severity,
             description=i.description,
+            mechanism=i.mechanism,
+            source=i.sources or None,
         )
         for i in found
     ]

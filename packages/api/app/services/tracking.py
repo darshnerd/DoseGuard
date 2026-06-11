@@ -4,7 +4,7 @@ from sqlmodel import select
 
 from app.models import DoseLog, DoseSchedule, Medication, MedicationIngredient
 from app.schemas.tracking import AdherenceOut, DayStat, TodayItem, TodayResponse, TodaySlot
-from app.services.interactions import check_pairs
+from app.services.interactions import check_pairs_grouped
 
 SLOT_ORDER = ["morning", "afternoon", "evening", "night"]
 SLOT_CUTOFF = {"morning": 11, "afternoon": 16, "evening": 21, "night": 24}
@@ -83,13 +83,12 @@ def build_today(session, user, now: datetime) -> TodayResponse:
                 status = "upcoming"
             items.append(TodayItem(medication_id=med.id, name=med.name, status=status))
 
-        ingredients = [
-            ing for s in slot_scheds for ing in ings_by_med.get(s.medication_id, [])
-        ]
+        groups = [ings_by_med.get(s.medication_id, []) for s in slot_scheds]
         warnings = [
-            f"{i.ingredient_a} + {i.ingredient_b} ({i.severity})"
-            for i in check_pairs(session, ingredients)
+            f"{i.a_norm} + {i.b_norm} ({i.severity})"
+            for i in check_pairs_grouped(session, groups)
         ]
+        
         slots_out.append(TodaySlot(slot=slot, items=items, warnings=warnings))
 
     adherence = compute_adherence(session, user, now=now)
@@ -134,7 +133,9 @@ def compute_adherence(session, user, days: int = 7, now: datetime | None = None)
             )
         ).all()
     )
-    return AdherenceOut(percent=round(taken / expected * 100), taken=taken, expected=expected)
+
+    percent = min(100, round(taken / expected * 100))
+    return AdherenceOut(percent=percent, taken=taken, expected=expected)
 
 
 def daily_history(session, user, days: int = 30, now: datetime | None = None) -> list[DayStat]:

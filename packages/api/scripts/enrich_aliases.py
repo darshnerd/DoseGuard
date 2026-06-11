@@ -4,9 +4,8 @@ import time
 import urllib.parse
 
 import httpx
-from sqlmodel import Session, create_engine, select
-
 from _common import DB, normalize
+from sqlmodel import Session, create_engine, select
 
 from app.models import DrugAlias, DrugConcept
 

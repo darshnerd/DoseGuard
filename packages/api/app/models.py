@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
+
 class DrugConcept(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     canonical_name: str

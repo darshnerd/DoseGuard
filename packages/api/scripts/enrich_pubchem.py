@@ -1,7 +1,6 @@
 import asyncio
 
 from _common import DB, worse
-
 from sqlmodel import Session, create_engine, select
 
 from app.models import DrugConcept, Interaction

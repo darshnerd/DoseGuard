@@ -8,3 +8,4 @@ class ResolvedDrug(BaseModel):
     name: str | None = None
     ingredient_rxcui: str | None = None
     ingredient_name: str | None = None
+    ingredient_names: list[str] = []

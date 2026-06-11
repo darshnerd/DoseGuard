@@ -6,7 +6,9 @@ from sqlmodel import Session, select
 from app.db import get_session
 from app.deps import get_current_user
 from app.models import ScanHistory, User
-from app.schemas.scan import ScanRecordOut
+from app.schemas.scan import ScanRecordOut, ScanUpdate
+from app.services.interactions import check_pairs
+from app.services.rxnorm import RxNormClient
 
 router = APIRouter(prefix="/scans", tags=["scans"])
 
@@ -36,3 +38,29 @@ def delete_scan(
     session.delete(record)
     session.commit()
     
+
+@router.patch("/{scan_id}", response_model=ScanRecordOut)
+async def update_scan(
+    scan_id: int,
+    req: ScanUpdate,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    record = session.get(ScanHistory, scan_id)
+    if not record or record.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Scan not found.")
+
+    client = RxNormClient()
+    ingredients = []
+    for drug in req.drugs:
+        resolved = await client.resolve(drug)
+        ingredients.append((resolved.ingredient_name or drug).lower())
+
+    found = check_pairs(session, ingredients)
+    record.drugs = req.drugs
+    record.interaction_count = len(found)
+    record.conflict_found = bool(found)
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return record

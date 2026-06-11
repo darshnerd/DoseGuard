@@ -14,8 +14,8 @@ def test_finds_conflict_any_case_or_order():
     session = memory_session()
     session.add(
         Interaction(
-            ingredient_a="aspirin",
-            ingredient_b="warfarin",
+            a_norm="aspirin",
+            b_norm="warfarin",
             severity="severe",
             description="bleeding",
         )

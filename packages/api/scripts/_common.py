@@ -4,7 +4,7 @@ from pathlib import Path
 
 API = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(API))
-from app.normalize import normalize
+from app.normalize import normalize  # noqa: E402, F401  (re-exported for scripts)
 
 DB = str(API / "doseguard.db")
 SOURCES = API / "app" / "data" / "sources"
@@ -13,9 +13,9 @@ SEV_NAME = {"major": "severe", "moderate": "moderate", "minor": "low"}
 SEV_RANK = {"contraindicated": 0, "severe": 1, "major": 1, "moderate": 2, "minor": 3, "low": 3}
 
 def connect():
-    c = sqlite3.connect(DB); 
-    c.execute("PRAGMA synchronous=OFF"); 
-    c.execute("PRAGMA journal_mode=WAL"); 
+    c = sqlite3.connect(DB)
+    c.execute("PRAGMA synchronous=OFF")
+    c.execute("PRAGMA journal_mode=WAL")
     return c
 
 def worse(a, b):

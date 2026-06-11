@@ -30,34 +30,38 @@ class RxNormClient:
         data = await self._get(f"/rxcui/{rxcui}/properties.json", {})
         return data.get("properties", {})
     
-    async def _ingredient(self, rxcui):
+    async def _ingredients(self, rxcui):
         data = await self._get(f"/rxcui/{rxcui}/related.json", {"tty": "IN"})
+        out = []
         for group in data.get("relatedGroup", {}).get("conceptGroup", []):
-            if group.get("tty") == "IN" and group .get("conceptProperties"):
-                prop = group["conceptProperties"][0]
-                return prop["rxcui"], prop["name"]
-        return None
-    
-    # interaction check
+            if group.get("tty") == "IN":
+                for prop in group.get("conceptProperties", []):
+                    out.append((prop["rxcui"], prop["name"]))
+        return out
+
     async def _build(self, term, rxcui):
         props = await self._properties(rxcui)
         name = props.get("name")
         tty = props.get("tty")
-        
+
         if tty == "IN":
             ing_rxcui, ing_name = rxcui, name
+            names = [name]
         else:
-            ing = await self._ingredient(rxcui)
-            ing_rxcui, ing_name = ing if ing else (None, None)
-            
+            ings = await self._ingredients(rxcui)
+            ing_rxcui, ing_name = ings[0] if ings else (None, None)
+            names = [n for _, n in ings] or ([ing_name] if ing_name else [])
+
         return ResolvedDrug(
             query=term,
-            matched = True,
+            matched=True,
             rxcui=rxcui,
             name=name,
             ingredient_rxcui=ing_rxcui,
-            ingredient_name=ing_name
+            ingredient_name=ing_name,
+            ingredient_names=[n.lower() for n in names],
         )
+
 
     async def resolve(self, term):
         rxcui = await self._approx_rxcui(term)

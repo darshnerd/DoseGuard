@@ -7,9 +7,10 @@ from sqlmodel import Session, select
 from app.db import get_session
 from app.deps import get_current_user
 from app.models import DoseSchedule, Medication, MedicationIngredient, User
+from app.normalize import split_components
 from app.schemas.interaction import InteractionCheckResponse, InteractionResult
 from app.schemas.medication import IngredientOut, MedicationCreate, MedicationOut, MedicationUpdate
-from app.services.interactions import check_pairs
+from app.services.interactions import check_pairs_grouped
 from app.services.rxnorm import RxNormClient
 
 router = APIRouter(prefix="/medications", tags=["medications"])
@@ -41,6 +42,12 @@ async def add_medication(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
+    # Block duplicates — same medicine can't be added twice (case-insensitive).
+    target = req.name.strip().lower()
+    existing = session.exec(select(Medication).where(Medication.user_id == user.id)).all()
+    if any(m.name.strip().lower() == target for m in existing):
+        raise HTTPException(status_code=409, detail="This medication is already in your list.")
+
     med = Medication(
         user_id=user.id,
         name=req.name,
@@ -53,24 +60,24 @@ async def add_medication(
 
     # Resolve each source drug into a salt. One scan (many drugs) => one med
     # with many MedicationIngredient rows.
-    sources = req.drugs if req.drugs else [req.name]
+    raw_sources = req.drugs if req.drugs else [req.name]
+    sources = [c for s in raw_sources for c in (split_components(s) or [s])]
+
     client = RxNormClient()
     seen: set[str] = set()
     for src in sources:
         if not src or not src.strip():
             continue
         resolved = await client.resolve(src)
-        ingredient = (resolved.ingredient_name or src).lower()
-        if ingredient in seen:
-            continue
-        seen.add(ingredient)
-        session.add(
-            MedicationIngredient(
-                medication_id=med.id,
-                ingredient=ingredient,
-                rxcui=resolved.rxcui,
+        names = resolved.ingredient_names or [(resolved.ingredient_name or src).lower()]
+        for ingredient in names:
+            ingredient = ingredient.lower()
+            if ingredient in seen:
+                continue
+            seen.add(ingredient)
+            session.add(
+                MedicationIngredient(medication_id=med.id, ingredient=ingredient, rxcui=resolved.rxcui)
             )
-        )
     session.commit()
     session.refresh(med)
     return _med_out(session, med)
@@ -96,7 +103,7 @@ def update_medication(
     data = req.model_dump(exclude_unset=True)
     if "name" in data and data["name"]:
         med.name = data["name"]
-    if "duration_days" in data:
+    if data.get("duration_days") is not None:
         med.duration_days = data["duration_days"]
     if "start_date" in data and data["start_date"]:
         med.start_date = data["start_date"]
@@ -136,14 +143,21 @@ def check_my_medications(
         .join(Medication, MedicationIngredient.medication_id == Medication.id)
         .where(Medication.user_id == user.id)
     ).all()
-    ingredients = [r.ingredient for r in rows]
-    found = check_pairs(session, ingredients)
+
+    groups: dict[int, list[str]] = {}
+    for r in rows:
+        groups.setdefault(r.medication_id, []).append(r.ingredient)
+    ingredients = [ing for g in groups.values() for ing in g]
+    found = check_pairs_grouped(session, list(groups.values()))
+
     results = [
         InteractionResult(
-            ingredient_a=i.ingredient_a,
-            ingredient_b=i.ingredient_b,
+            ingredient_a=i.a_norm,
+            ingredient_b=i.b_norm,
             severity=i.severity,
             description=i.description,
+            mechanism=i.mechanism,
+            source=i.sources or None,
         )
         for i in found
     ]

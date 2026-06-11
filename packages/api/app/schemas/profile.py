@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,6 +11,7 @@ class ProfileOut(BaseModel):
     full_name: str | None
     age: int | None
     sex: str | None
+    created_at: datetime
 
 
 class ProfileUpdate(BaseModel):

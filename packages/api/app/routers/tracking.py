@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -102,13 +102,29 @@ def log_dose(
         raise HTTPException(status_code=422, detail="status must be taken or skipped.")
     _owned_medication(session, user, req.medication_id)
 
-    log = DoseLog(
-        user_id=user.id,
-        medication_id=req.medication_id,
-        slot=req.slot,
-        status=req.status,
-        taken_at=datetime.now(UTC),
-    )
+    now = datetime.now(UTC)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+    log = session.exec(
+        select(DoseLog).where(
+            DoseLog.user_id == user.id,
+            DoseLog.medication_id == req.medication_id,
+            DoseLog.slot == req.slot,
+            DoseLog.taken_at >= day_start,
+            DoseLog.taken_at < day_end,
+        )
+    ).first()
+    if log:
+        log.status = req.status
+        log.taken_at = now
+    else:
+        log = DoseLog(
+            user_id=user.id,
+            medication_id=req.medication_id,
+            slot=req.slot,
+            status=req.status,
+            taken_at=now,
+        )
     session.add(log)
     session.commit()
     session.refresh(log)

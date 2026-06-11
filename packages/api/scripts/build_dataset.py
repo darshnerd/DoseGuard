@@ -1,11 +1,10 @@
-from sqlmodel import SQLModel, create_engine
-
 import ingest_curated
 import ingest_ddinter
 import ingest_descriptions
 import ingest_indian
 import ingest_mechanisms
 from _common import DB, connect, normalize, worse
+from sqlmodel import SQLModel, create_engine
 
 INTERACTION_SOURCES = [ingest_ddinter, ingest_descriptions, ingest_mechanisms, ingest_curated]
 

@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IngredientOut(BaseModel):
@@ -13,13 +13,13 @@ class IngredientOut(BaseModel):
 class MedicationCreate(BaseModel):
     name: str
     drugs: list[str] | None = None
-    duration_days: int | None = None
+    duration_days: int = Field(gt=0)
     start_date: date | None = None
 
 
 class MedicationUpdate(BaseModel):
     name: str | None = None
-    duration_days: int | None = None
+    duration_days: int | None = Field(default=None, gt=0)
     start_date: date | None = None
 
 
