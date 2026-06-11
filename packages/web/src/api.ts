@@ -71,6 +71,7 @@ export interface Profile {
   full_name: string | null;
   age: number | null;
   sex: string | null;
+  timezone: string;
   created_at: string;
 }
 
@@ -118,7 +119,9 @@ function clearTokens() {
   localStorage.removeItem("email");
 }
 
-async function refreshTokens(): Promise<boolean> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
   const refresh = localStorage.getItem("refresh_token");
   if (!refresh) return false;
   const res = await fetch(`${API_URL}/auth/refresh`, {
@@ -132,6 +135,15 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
+function refreshTokens(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 async function request(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
   const headers = new Headers(options.headers);
   const access = localStorage.getItem("access_token");
@@ -143,11 +155,13 @@ async function request(path: string, options: RequestInit = {}, retry = true): P
     if (retry && (await refreshTokens())) {
       return request(path, options, false);
     }
-    // refresh failed → session is dead: clear and bounce to login
+    // refresh failed → session is dead: clear, bounce to login, and stop here so
+    // callers don't surface a spurious "failed to load" error during the redirect.
     clearTokens();
     if (window.location.pathname !== "/login") {
       window.location.assign("/login");
     }
+    throw new Error("Session expired. Please sign in again.");
   }
   return res;
 }

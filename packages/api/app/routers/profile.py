@@ -1,6 +1,7 @@
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from app.db import get_session
@@ -22,10 +23,15 @@ def update_profile(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    for key, value in req.model_dump(exclude_unset=True).items():
+    data = req.model_dump(exclude_unset=True)
+    if data.get("timezone") is not None:
+        try:
+            ZoneInfo(data["timezone"])
+        except (ZoneInfoNotFoundError, ValueError):
+            raise HTTPException(status_code=422, detail="Invalid timezone.") from None
+    for key, value in data.items():
         setattr(user, key, value)
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
-    

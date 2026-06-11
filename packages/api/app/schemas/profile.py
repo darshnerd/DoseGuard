@@ -11,6 +11,7 @@ class ProfileOut(BaseModel):
     full_name: str | None
     age: int | None
     sex: str | None
+    timezone: str
     created_at: datetime
 
 
@@ -18,4 +19,4 @@ class ProfileUpdate(BaseModel):
     full_name: str | None = None
     age: int | None = None
     sex: str | None = None
-    
+    timezone: str | None = None

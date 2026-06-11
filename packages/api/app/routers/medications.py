@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.deps import get_current_user
-from app.models import DoseSchedule, Medication, MedicationIngredient, User
+from app.models import DoseLog, DoseSchedule, Medication, MedicationIngredient, User
 from app.normalize import split_components
 from app.schemas.interaction import InteractionCheckResponse, InteractionResult
 from app.schemas.medication import IngredientOut, MedicationCreate, MedicationOut, MedicationUpdate
@@ -48,22 +48,11 @@ async def add_medication(
     if any(m.name.strip().lower() == target for m in existing):
         raise HTTPException(status_code=409, detail="This medication is already in your list.")
 
-    med = Medication(
-        user_id=user.id,
-        name=req.name,
-        start_date=req.start_date or datetime.now(UTC).date(),
-        duration_days=req.duration_days,
-    )
-    session.add(med)
-    session.commit()
-    session.refresh(med)
-
-    # Resolve each source drug into a salt. One scan (many drugs) => one med
-    # with many MedicationIngredient rows.
     raw_sources = req.drugs if req.drugs else [req.name]
     sources = [c for s in raw_sources for c in (split_components(s) or [s])]
 
     client = RxNormClient()
+    resolved_ings: list[tuple[str, str | None]] = []
     seen: set[str] = set()
     for src in sources:
         if not src or not src.strip():
@@ -75,9 +64,20 @@ async def add_medication(
             if ingredient in seen:
                 continue
             seen.add(ingredient)
-            session.add(
-                MedicationIngredient(medication_id=med.id, ingredient=ingredient, rxcui=resolved.rxcui)
-            )
+            resolved_ings.append((ingredient, resolved.rxcui))
+
+    med = Medication(
+        user_id=user.id,
+        name=req.name,
+        start_date=req.start_date or datetime.now(UTC).date(),
+        duration_days=req.duration_days,
+    )
+    session.add(med)
+    session.flush()
+    for ingredient, rxcui in resolved_ings:
+        session.add(
+            MedicationIngredient(medication_id=med.id, ingredient=ingredient, rxcui=rxcui)
+        )
     session.commit()
     session.refresh(med)
     return _med_out(session, med)
@@ -128,6 +128,10 @@ def delete_medication(
         select(DoseSchedule).where(DoseSchedule.medication_id == med_id)
     ).all():
         session.delete(sched)
+    for log in session.exec(
+        select(DoseLog).where(DoseLog.medication_id == med_id)
+    ).all():
+        session.delete(log)
     session.delete(med)
     session.commit()
 

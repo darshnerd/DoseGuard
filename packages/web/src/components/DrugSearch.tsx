@@ -31,17 +31,20 @@ export default function DrugSearch({ onSearch, onSelect, placeholder = "Search m
       setOpen(false);
       return;
     }
+    let ignore = false;
     setLoading(true);
     timer.current = setTimeout(async () => {
       try {
         const results = await onSearch(q);
+        if (ignore) return;
         setHits(results);
         setOpen(true);
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     }, 250);
     return () => {
+      ignore = true;
       if (timer.current) clearTimeout(timer.current);
     };
 }, [query, onSearch]);

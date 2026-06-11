@@ -71,7 +71,7 @@ function EditModal({ scan, onSaved }: { scan: ScanRecord; onSaved: () => void })
                   onSearch={api.searchDrugs}
                   onSelect={(hit) => {
                     const v = hit.normalized.toLowerCase();
-                    if (!drugs.includes(v)) setDrugs([...drugs, v]);
+                    if (!drugs.some((d) => d.toLowerCase() === v)) setDrugs([...drugs, v]);
                   }}
                   placeholder="Add a drug"
                 />
@@ -180,7 +180,7 @@ export default function Scans() {
                           </Table.Cell>
                           <Table.Cell>
                             <div className="flex gap-2">
-                              <EditModal scan={s} onSaved={load} />
+                              <EditModal key={`${s.id}:${s.drugs.join(",")}`} scan={s} onSaved={load} />
                               <Button size="sm" variant="danger" onPress={() => remove(s.id)}>
                                 <Trash2 className="mr-1 size-4" /> Delete
                               </Button>

@@ -108,8 +108,12 @@ async def detect_drugs(session, image):
     fallback = list(unresolved_singles)[:MAX_RXNORM_FALLBACK]
     if fallback:
         client = RxNormClient()
-        results = await asyncio.gather(*[_rxnorm_lookup(client, p) for p in fallback])
+        results = await asyncio.gather(
+            *[_rxnorm_lookup(client, p) for p in fallback], return_exceptions=True
+        )
         for names in results:
+            if isinstance(names, Exception):
+                continue
             for name in names:
                 ingredient = name.lower()
                 if ingredient and ingredient not in seen:

@@ -304,7 +304,7 @@ export default function Medications() {
     const next = current.includes(slot)
       ? current.filter((s) => s !== slot)
       : [...current, slot];
-    setSchedules({ ...schedules, [medId]: next });
+    setSchedules((prev) => ({ ...prev, [medId]: next }));
     try {
       await api.setSchedule(medId, next);
     } catch (e) {

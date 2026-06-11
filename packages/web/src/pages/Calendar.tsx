@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type DayStat } from "../api";
 import { FadeItem, PageHeader, Stat } from "../components/ui";
 
-const todayIso = new Date().toISOString().slice(0, 10);
+function todayIso(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type DayState = "complete" | "partial" | "missed" | "pending" | "none";
@@ -13,7 +18,7 @@ function dayState(d: DayStat): DayState {
   if (d.expected === 0) return "none";
   if (d.taken >= d.expected) return "complete";
   if (d.taken > 0) return "partial";
-  return d.date >= todayIso ? "pending" : "missed";
+  return d.date >= todayIso() ? "pending" : "missed";
 }
 
 const DOT: Record<DayState, string> = {
@@ -46,7 +51,7 @@ function TwoWeekStrip({ history }: { history: DayStat[] }) {
       {last14.map((d) => {
         const date = new Date(`${d.date}T00:00:00`);
         const state = dayState(d);
-        const isToday = d.date === todayIso;
+        const isToday = d.date === todayIso();
         return (
           <div
             key={d.date}

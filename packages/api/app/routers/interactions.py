@@ -25,8 +25,10 @@ async def check_interactions(
     ingredients = []
     for drug in req.drugs:
         resolved = await client.resolve(drug)
-        if resolved.ingredient_name:
-            ingredients.append(resolved.ingredient_name)
+        names = resolved.ingredient_names or (
+            [resolved.ingredient_name] if resolved.ingredient_name else []
+        )
+        ingredients.extend(names)
 
     found = check_pairs(session, ingredients)
     results = [

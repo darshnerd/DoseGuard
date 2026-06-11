@@ -54,7 +54,8 @@ async def update_scan(
     ingredients = []
     for drug in req.drugs:
         resolved = await client.resolve(drug)
-        ingredients.append((resolved.ingredient_name or drug).lower())
+        names = resolved.ingredient_names or [(resolved.ingredient_name or drug).lower()]
+        ingredients.extend(name.lower() for name in names)
 
     found = check_pairs(session, ingredients)
     record.drugs = req.drugs

@@ -64,6 +64,7 @@ class User(SQLModel, table=True):
     full_name: str | None = None
     age: int | None = None
     sex: str | None = None
+    timezone: str = Field(default="Asia/Kolkata")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

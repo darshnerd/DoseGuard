@@ -38,6 +38,8 @@ async def resolve_term(session: Session, text_in: str) -> list[Resolved]:
         return [Resolved(m[0], m[1] / 100, "fuzzy")]
 
     r = await RxNormClient().resolve(text_in)
+    if r.matched and r.ingredient_names:
+        return [Resolved(normalize(name), 0.7, "rxnorm") for name in r.ingredient_names]
     if r.matched and r.ingredient_name:
         return [Resolved(normalize(r.ingredient_name), 0.7, "rxnorm")]
     return [Resolved(n, 0.2, "unknown")]

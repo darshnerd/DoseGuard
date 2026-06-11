@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
@@ -20,6 +21,14 @@ from app.services.tracking import build_today, compute_adherence, daily_history,
 router = APIRouter(prefix="/tracking", tags=["tracking"])
 
 
+def _user_now(user: User) -> datetime:
+    try:
+        tz = ZoneInfo(user.timezone or "Asia/Kolkata")
+    except Exception:
+        tz = ZoneInfo("Asia/Kolkata")
+    return datetime.now(tz)
+
+
 def _owned_medication(session: Session, user: User, medication_id: int) -> Medication:
     med = session.get(Medication, medication_id)
     if not med or med.user_id != user.id:
@@ -32,7 +41,7 @@ def get_today(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    return build_today(session, user, datetime.now(UTC))
+    return build_today(session, user, _user_now(user))
 
 
 @router.get("/schedule", response_model=list[ScheduleOut])
@@ -102,9 +111,11 @@ def log_dose(
         raise HTTPException(status_code=422, detail="status must be taken or skipped.")
     _owned_medication(session, user, req.medication_id)
 
-    now = datetime.now(UTC)
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
+    # One log per (med, slot) per LOCAL day; taken_at itself is stored in UTC.
+    now_local = _user_now(user)
+    local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = local_midnight.astimezone(UTC)
+    day_end = (local_midnight + timedelta(days=1)).astimezone(UTC)
     log = session.exec(
         select(DoseLog).where(
             DoseLog.user_id == user.id,
@@ -114,16 +125,17 @@ def log_dose(
             DoseLog.taken_at < day_end,
         )
     ).first()
+    now_utc = datetime.now(UTC)
     if log:
         log.status = req.status
-        log.taken_at = now
+        log.taken_at = now_utc
     else:
         log = DoseLog(
             user_id=user.id,
             medication_id=req.medication_id,
             slot=req.slot,
             status=req.status,
-            taken_at=now,
+            taken_at=now_utc,
         )
     session.add(log)
     session.commit()
@@ -150,7 +162,7 @@ def get_adherence(
     user: Annotated[User, Depends(get_current_user)] = None,
     session: Annotated[Session, Depends(get_session)] = None,
 ):
-    return compute_adherence(session, user, days=days)
+    return compute_adherence(session, user, days=days, now=_user_now(user))
 
 
 @router.get("/history", response_model=list[DayStat])
@@ -159,4 +171,4 @@ def get_history(
     user: Annotated[User, Depends(get_current_user)] = None,
     session: Annotated[Session, Depends(get_session)] = None,
 ):
-    return daily_history(session, user, days=days)
+    return daily_history(session, user, days=days, now=_user_now(user))

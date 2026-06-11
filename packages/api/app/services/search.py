@@ -16,17 +16,22 @@ def search_drugs(session: Session, query: str, limit: int = 10) -> list[dict]:
     products = session.exec(
         select(MedicineProduct).where(MedicineProduct.name_normalized.contains(n))
     ).all()
-    for p in products[:limit]:
+    product_count = 0
+    for p in products:
         if p.name_normalized in seen:
             continue
         seen.add(p.name_normalized)
+        score = 100 if p.name_normalized == n else int(fuzz.WRatio(n, p.name_normalized))
         results.append({
             "name": p.name,
             "normalized": p.name_normalized,
             "kind": "product",
             "manufacturer": p.manufacturer,
-            "score": 100,
+            "score": score,
         })
+        product_count += 1
+        if product_count >= limit:
+            break
 
     concept_names = session.exec(select(DrugConcept.normalized_name)).all()
     for name, score, _ in process.extract(n, concept_names, scorer=fuzz.WRatio, limit=limit):
@@ -43,4 +48,3 @@ def search_drugs(session: Session, query: str, limit: int = 10) -> list[dict]:
 
     results.sort(key=lambda r: r["score"], reverse=True)
     return results[:limit]
-    
