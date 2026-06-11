@@ -1,5 +1,5 @@
 
-import { Input, Spinner } from "@heroui/react";
+import { InputGroup, Spinner, TextField } from "@heroui/react";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -21,7 +21,7 @@ export default function DrugSearch({ onSearch, onSelect, placeholder = "Search m
   const [hits, setHits] = useState<DrugHit[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -55,13 +55,19 @@ export default function DrugSearch({ onSearch, onSelect, placeholder = "Search m
 
   return (
     <div className="relative w-full">
-      <Input
-        value={query}
-        onValueChange={setQuery}
-        placeholder={placeholder}
-        startContent={<Search className="size-4 text-gray-400" />}
-        endContent={loading ? <Spinner size="sm" /> : null}
-      />
+      <TextField aria-label="Drug search" value={query} onChange={setQuery}>
+        <InputGroup>
+          <InputGroup.Prefix>
+            <Search className="size-4 text-gray-400" />
+          </InputGroup.Prefix>
+          <InputGroup.Input placeholder={placeholder} />
+          {loading && (
+            <InputGroup.Suffix>
+              <Spinner size="sm" />
+            </InputGroup.Suffix>
+          )}
+        </InputGroup>
+      </TextField>
       {open && hits.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-gray-100 bg-white shadow-lg">
           {hits.map((hit) => (

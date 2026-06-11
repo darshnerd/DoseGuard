@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, type Adherence, type DoseStatus, type Slot, type TodayResponse } from "../api";
+import { api, type DoseStatus, type Slot, type TodayResponse } from "../api";
 import { FadeItem, PageHeader, Stagger } from "../components/ui";
 
 const SLOT_META: Record<Slot, { label: string; icon: LucideIcon; tint: string }> = {
@@ -38,17 +38,17 @@ function ringColor(p: number): "success" | "warning" | "danger" {
   return p >= 80 ? "success" : p >= 50 ? "warning" : "danger";
 }
 
-function AdherenceRing({ percent, adherence }: { percent: number; adherence: Adherence | null }) {
-  const hasSchedule = (adherence?.expected ?? 0) > 0;
+function DailyRing({ percent, taken, total }: { percent: number; taken: number; total: number }) {
+  const has = total > 0;
   return (
     <Card>
       <Card.Content>
         <div className="flex items-center gap-5">
           <div className="relative inline-flex size-28 items-center justify-center">
             <ProgressCircle
-              aria-label="7-day adherence"
-              value={percent}
-              color={ringColor(percent)}
+              aria-label="Today's adherence"
+              value={has ? percent : 0}
+              color={has ? ringColor(percent) : "default"}
               size="lg"
               className="size-28"
             >
@@ -57,27 +57,21 @@ function AdherenceRing({ percent, adherence }: { percent: number; adherence: Adh
                 <ProgressCircle.FillCircle />
               </ProgressCircle.Track>
             </ProgressCircle>
-            <span className="absolute text-2xl font-bold text-gray-900">
-              {hasSchedule ? `${percent}%` : "—"}
-            </span>
+            <span className="absolute text-2xl font-bold text-gray-900">{has ? `${percent}%` : "—"}</span>
           </div>
           <div>
-            <div className="text-sm font-medium text-gray-500">7-day adherence</div>
-            {hasSchedule ? (
+            <div className="text-sm font-medium text-gray-500">Today's adherence</div>
+            {has ? (
               <>
                 <div className="mt-1 text-lg font-semibold text-gray-900">
-                  {percent >= 80 ? "On track 🎯" : percent >= 50 ? "Keep going 💪" : "Needs attention"}
+                  {percent === 100 ? "All done 🎉" : percent >= 50 ? "Keep going 💪" : "Let’s start"}
                 </div>
-                <div className="mt-1 text-sm text-gray-500">
-                  {adherence!.taken} of {adherence!.expected} doses taken
-                </div>
+                <div className="mt-1 text-sm text-gray-500">{taken} of {total} doses taken</div>
               </>
             ) : (
               <>
-                <div className="mt-1 text-lg font-semibold text-gray-900">No schedule yet</div>
-                <div className="mt-1 text-sm text-gray-500">
-                  Assign slots to your meds to start tracking.
-                </div>
+                <div className="mt-1 text-lg font-semibold text-gray-900">No doses today</div>
+                <div className="mt-1 text-sm text-gray-500">Nothing scheduled.</div>
               </>
             )}
           </div>
@@ -115,16 +109,13 @@ function StatusBar({ counts, total }: { counts: Record<DoseStatus, number>; tota
 
 export default function Today() {
   const [data, setData] = useState<TodayResponse | null>(null);
-  const [adherence, setAdherence] = useState<Adherence | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [flashed, setFlashed] = useState<Set<string>>(new Set());
 
   async function load() {
     try {
-      const [today, adh] = await Promise.all([api.getToday(), api.getAdherence()]);
-      setData(today);
-      setAdherence(adh);
+      setData(await api.getToday());
     } catch (e) {
       setError((e as Error).message);
     }
@@ -181,9 +172,13 @@ export default function Today() {
 
       {/* Summary strip */}
       <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <FadeItem>
-          <AdherenceRing percent={data.adherence} adherence={adherence} />
-        </FadeItem>
+      <FadeItem>
+        <DailyRing
+          percent={total ? Math.round((counts.taken / total) * 100) : 0}
+          taken={counts.taken}
+          total={total}
+        />
+      </FadeItem>
         <FadeItem>
           <Card>
             <Card.Content>

@@ -1,21 +1,16 @@
-import { Alert, Button, Card, Chip, Input, Modal, Table } from "@heroui/react";
-import { History, RotateCw, Trash2 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Alert, Button, Card, Chip, Modal, Table } from "@heroui/react";
+import { History, RotateCw, Save, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api, type Interaction, type ScanRecord } from "../api";
+import DrugSearch from "../components/DrugSearch";
 import { FadeItem, PageHeader, severityColor } from "../components/ui";
 
-function EditModal({ scan }: { scan: ScanRecord }) {
+function EditModal({ scan, onSaved }: { scan: ScanRecord; onSaved: () => void }) {
   const [drugs, setDrugs] = useState<string[]>(scan.drugs);
-  const [name, setName] = useState("");
   const [results, setResults] = useState<Interaction[] | null>(null);
   const [error, setError] = useState("");
-
-  function add(e: FormEvent) {
-    e.preventDefault();
-    const value = name.trim().toLowerCase();
-    if (value && !drugs.includes(value)) setDrugs([...drugs, value]);
-    setName("");
-  }
+  const [rechecking, setRechecking] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   function remove(d: string) {
     setDrugs(drugs.filter((x) => x !== d));
@@ -23,10 +18,26 @@ function EditModal({ scan }: { scan: ScanRecord }) {
 
   async function recheck() {
     setError("");
+    setRechecking(true);
     try {
       setResults((await api.checkInteractions(drugs)).interactions);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setRechecking(false);
+    }
+  }
+
+  async function save() {
+    setError("");
+    setSaving(true);
+    try {
+      await api.updateScan(scan.id, drugs);
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -55,13 +66,28 @@ function EditModal({ scan }: { scan: ScanRecord }) {
                     </Chip>
                   ))}
                 </div>
-                <form className="flex gap-2" onSubmit={add}>
-                  <Input fullWidth placeholder="Add a drug" value={name} onChange={(e) => setName(e.target.value)} />
-                  <Button type="submit" variant="secondary">
-                    Add
+
+                <DrugSearch
+                  onSearch={api.searchDrugs}
+                  onSelect={(hit) => {
+                    const v = hit.normalized.toLowerCase();
+                    if (!drugs.includes(v)) setDrugs([...drugs, v]);
+                  }}
+                  placeholder="Add a drug"
+                />
+
+                <div className="flex gap-2">
+                  <Button
+                    onPress={recheck}
+                    isPending={rechecking}
+                    isDisabled={rechecking || drugs.length === 0}
+                  >
+                    {rechecking ? "Checking…" : "Re-check interactions"}
                   </Button>
-                </form>
-                <Button onPress={recheck}>Re-check interactions</Button>
+                  <Button variant="secondary" onPress={save} isPending={saving} isDisabled={saving}>
+                    <Save className="mr-1 size-4" /> {saving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
 
                 {results &&
                   (results.length === 0 ? (
@@ -154,7 +180,7 @@ export default function Scans() {
                           </Table.Cell>
                           <Table.Cell>
                             <div className="flex gap-2">
-                              <EditModal scan={s} />
+                              <EditModal scan={s} onSaved={load} />
                               <Button size="sm" variant="danger" onPress={() => remove(s.id)}>
                                 <Trash2 className="mr-1 size-4" /> Delete
                               </Button>

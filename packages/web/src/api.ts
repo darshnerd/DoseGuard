@@ -71,6 +71,7 @@ export interface Profile {
   full_name: string | null;
   age: number | null;
   sex: string | null;
+  created_at: string;
 }
 
 export type Slot = "morning" | "afternoon" | "evening" | "night";
@@ -196,11 +197,11 @@ export const api = {
     return res.json();
   },
 
-  async addMedication(name: string, drugs?: string[], durationDays?: number | null): Promise<Medication> {
+  async addMedication(name: string, drugs: string[] | undefined, durationDays: number): Promise<Medication> {
     const res = await request("/medications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, drugs, duration_days: durationDays ?? null }),
+      body: JSON.stringify({ name, drugs, duration_days: durationDays }),
     });
     if (!res.ok) throw new Error(await detail(res, "Failed to add medication"));
     return res.json();
@@ -323,6 +324,27 @@ export const api = {
     const res = await request(`/drugs/search?q=${encodeURIComponent(q)}`);
     if (!res.ok) return [];
     return res.json();
+  },
+
+  async updateScan(id: number, drugs: string[]): Promise<ScanRecord> {
+    const res = await request(`/scans/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ drugs }),
+    });
+    if (!res.ok) throw new Error(await detail(res, "Failed to save scan"));
+    return res.json();
+    },
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const res = await request("/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    if (!res.ok) throw new Error(await detail(res, "Failed to change password"));
+    const data = await res.json();
+    setTokens(data.access_token, data.refresh_token);
   },
 
 };

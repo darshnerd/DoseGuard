@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Input, ListBox, Modal, Select, ToggleButton } from "@heroui/react";
+import { Button, Card, Chip, Input, Modal, ToggleButton } from "@heroui/react";
 import {
   Moon,
   Pill,
@@ -23,48 +23,73 @@ const SLOTS: { slot: Slot; label: string; icon: LucideIcon }[] = [
   { slot: "night", label: "Night", icon: Moon },
 ];
 
-const DURATIONS: { id: string; label: string; value: number | null }[] = [
-  { id: "ongoing", label: "Ongoing", value: null },
-  { id: "3", label: "3 days", value: 3 },
-  { id: "5", label: "5 days", value: 5 },
-  { id: "7", label: "7 days", value: 7 },
-  { id: "10", label: "10 days", value: 10 },
-  { id: "14", label: "14 days", value: 14 },
-  { id: "30", label: "30 days", value: 30 },
-];
-
-const durationKey = (d: number | null) => (d == null ? "ongoing" : String(d));
-const keyToDuration = (k: string) => DURATIONS.find((d) => d.id === k)?.value ?? null;
-
-function DurationSelect({
+function DurationControl({
   value,
   onChange,
 }: {
   value: number | null;
-  onChange: (v: number | null) => void;
+  onChange: (v: number) => void;
 }) {
   return (
-    <Select
-      aria-label="Course length"
-      selectedKey={durationKey(value)}
-      onSelectionChange={(k) => onChange(keyToDuration(String(k)))}
-      className="w-36"
-    >
-      <Select.Trigger>
-        <Select.Value />
-        <Select.Indicator />
-      </Select.Trigger>
-      <Select.Popover>
-        <ListBox>
-          {DURATIONS.map((d) => (
-            <ListBox.Item key={d.id} id={d.id} textValue={d.label}>
-              {d.label}
-              <ListBox.ItemIndicator />
-            </ListBox.Item>
-          ))}
-        </ListBox>
-      </Select.Popover>
-    </Select>
+    <div className="flex items-center gap-2">
+      <Input
+        type="number"
+        min={1}
+        className="w-28"
+        placeholder="Days"
+        value={value == null ? "" : String(value)}
+        onChange={(e) => {
+          const n = parseInt(e.target.value, 10);
+          if (Number.isFinite(n) && n > 0) onChange(n);
+        }}
+      />
+      <span className="text-sm text-gray-500">days</span>
+    </div>
+  );
+}
+
+function CourseEditor({
+  med,
+  onSave,
+}: {
+  med: Medication;
+  onSave: (med: Medication, days: number) => Promise<void>;
+}) {
+  const [val, setVal] = useState(med.duration_days != null ? String(med.duration_days) : "");
+  const [saving, setSaving] = useState(false);
+  const n = parseInt(val, 10);
+  const valid = Number.isFinite(n) && n > 0;
+  const changed = valid && n !== med.duration_days;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-gray-500">Course</span>
+      <Input
+        type="number"
+        min={1}
+        className="w-24"
+        placeholder="Days"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+      />
+      <span className="text-sm text-gray-500">days</span>
+      <Button
+        size="sm"
+        variant="secondary"
+        isDisabled={!changed || saving}
+        isPending={saving}
+        onPress={async () => {
+          setSaving(true);
+          try {
+            await onSave(med, n);
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        Save
+      </Button>
+    </div>
   );
 }
 
@@ -84,7 +109,7 @@ function AddFromScanModal({
   onAdd,
 }: {
   scans: ScanRecord[];
-  onAdd: (name: string, drugs: string[], durationDays: number | null) => Promise<void>;
+  onAdd: (name: string, drugs: string[], durationDays: number) => Promise<boolean>;
 }) {
   const usable = scans.filter((s) => s.drugs.length > 0);
   const [names, setNames] = useState<Record<number, string>>({});
@@ -102,10 +127,11 @@ function AddFromScanModal({
 
   async function add(scan: ScanRecord) {
     const name = (names[scan.id] ?? scan.drugs.join(" + ")).trim();
-    if (!name) return;
+    const d = durations[scan.id];
+    if (!name || !d || d < 1) return;
     setAdding(scan.id);
     try {
-      await onAdd(name, scan.drugs, durations[scan.id] ?? null);
+      await onAdd(name, scan.drugs, d);
     } finally {
       setAdding(null);
     }
@@ -158,14 +184,14 @@ function AddFromScanModal({
                             setNames((prev) => ({ ...prev, [scan.id]: e.target.value }))
                           }
                         />
-                        <DurationSelect
+                        <DurationControl
                           value={durations[scan.id] ?? null}
                           onChange={(v) => setDurations((prev) => ({ ...prev, [scan.id]: v }))}
                         />
                         <Button
                           size="sm"
                           isPending={adding === scan.id}
-                          isDisabled={adding !== null}
+                          isDisabled={adding !== null || !durations[scan.id]}
                           onPress={() => add(scan)}
                         >
                           <Plus className="mr-1 size-4" /> Add
@@ -193,6 +219,7 @@ export default function Medications() {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [schedules, setSchedules] = useState<Record<number, Slot[]>>({});
   const [name, setName] = useState("");
+  const [days, setDays] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -216,20 +243,48 @@ export default function Medications() {
     load();
   }, []);
 
-  async function addByName(value: string, drugs?: string[], durationDays: number | null = null) {
-    if (!value.trim()) return;
-    await api.addMedication(value.trim(), drugs, durationDays);
-    await load();
+  async function addByName(
+    value: string,
+    drugs: string[] | undefined,
+    durationDays: number
+  ): Promise<boolean> {
+    if (!value.trim()) return false;
+    setError("");
+    try {
+      await api.addMedication(value.trim(), drugs, durationDays);
+      await load();
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    }
+  }
+
+  function parsedDays(): number | null {
+    const n = parseInt(days, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  function pick(value: string) {
+    const n = parsedDays();
+    if (!n) {
+      setError("Enter the number of days before adding.");
+      return;
+    }
+    addByName(value, undefined, n);
   }
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    await addByName(name);
-    setName("");
+    const n = parsedDays();
+    if (!name.trim() || !n) {
+      setError("Enter a medicine name and number of days.");
+      return;
+    }
+    if (await addByName(name, undefined, n)) setName("");
   }
 
-  async function setDuration(med: Medication, duration: number | null) {
+  async function setDuration(med: Medication, duration: number) {
     setMeds((prev) => prev.map((m) => (m.id === med.id ? { ...m, duration_days: duration } : m)));
     try {
       await api.updateMedication(med.id, { duration_days: duration });
@@ -269,7 +324,7 @@ export default function Medications() {
               <div className="flex-1">
                 <DrugSearch
                   onSearch={api.searchDrugs}
-                  onSelect={(hit) => addByName(hit.name)}
+                  onSelect={(hit) => pick(hit.name)}
                   placeholder="Search a medicine or salt (e.g. warfarin)"
                 />
               </div>
@@ -278,6 +333,14 @@ export default function Medications() {
                   placeholder="…or type a name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  className="w-24"
+                  placeholder="Days"
+                  value={days}
+                  onChange={(e) => setDays(e.target.value)}
                 />
                 <Button type="submit">
                   <Plus className="mr-1 size-4" /> Add
@@ -323,9 +386,8 @@ export default function Medications() {
                       </Button>
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-gray-500">Course</span>
-                      <DurationSelect value={m.duration_days} onChange={(v) => setDuration(m, v)} />
+                    <div className="mt-3">
+                      <CourseEditor med={m} onSave={setDuration} />
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-1.5">

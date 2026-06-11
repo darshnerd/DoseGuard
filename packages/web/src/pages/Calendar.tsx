@@ -1,10 +1,11 @@
 import { Calendar as HeroCalendar, Card, Spinner } from "@heroui/react";
-import { CalendarCheck, CheckCheck, TrendingUp } from "lucide-react";
+import { CalendarCheck, CalendarRange, CheckCheck, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type DayStat } from "../api";
 import { FadeItem, PageHeader, Stat } from "../components/ui";
 
 const todayIso = new Date().toISOString().slice(0, 10);
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type DayState = "complete" | "partial" | "missed" | "pending" | "none";
 
@@ -23,12 +24,50 @@ const DOT: Record<DayState, string> = {
   none: "",
 };
 
+const TILE: Record<DayState, string> = {
+  complete: "bg-emerald-500 text-white",
+  partial: "bg-amber-400 text-white",
+  missed: "bg-red-500 text-white",
+  pending: "bg-blue-50 text-blue-700 border border-blue-200",
+  none: "bg-gray-50 text-gray-400",
+};
+
 const LEGEND = [
   { cls: "bg-emerald-500", label: "All taken" },
   { cls: "bg-amber-400", label: "Partial" },
   { cls: "bg-red-500", label: "Missed" },
   { cls: "bg-blue-400", label: "Today / pending" },
 ];
+
+function TwoWeekStrip({ history }: { history: DayStat[] }) {
+  const last14 = history.slice(-14);
+  return (
+    <div className="grid grid-cols-7 gap-2 sm:gap-3">
+      {last14.map((d) => {
+        const date = new Date(`${d.date}T00:00:00`);
+        const state = dayState(d);
+        const isToday = d.date === todayIso;
+        return (
+          <div
+            key={d.date}
+            title={`${d.date} — ${d.taken}/${d.expected} taken`}
+            className={`flex aspect-square flex-col items-center justify-center rounded-2xl transition-transform hover:scale-105 ${TILE[state]} ${
+              isToday ? "ring-2 ring-blue-500 ring-offset-2" : ""
+            }`}
+          >
+            <span className="text-[10px] font-medium uppercase opacity-80">{WD[date.getDay()]}</span>
+            <span className="text-lg font-bold leading-none">{date.getDate()}</span>
+            {d.expected > 0 && (
+              <span className="mt-0.5 text-[10px] font-medium opacity-90">
+                {d.taken}/{d.expected}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CalendarPage() {
   const [history, setHistory] = useState<DayStat[] | null>(null);
@@ -48,8 +87,6 @@ export default function CalendarPage() {
     const days = history ?? [];
     const totalTaken = days.reduce((s, d) => s + d.taken, 0);
     const trackedDays = days.filter((d) => d.expected > 0).length;
-
-    // Last 12 weeks of adherence (oldest→newest chunks of 7).
     const weeks: { pct: number | null }[] = [];
     for (let i = Math.max(0, days.length - 84); i < days.length; i += 7) {
       const chunk = days.slice(i, i + 7);
@@ -57,7 +94,6 @@ export default function CalendarPage() {
       const t = chunk.reduce((s, d) => s + d.taken, 0);
       weeks.push({ pct: e ? Math.round((t / e) * 100) : null });
     }
-
     return { totalTaken, trackedDays, weeks };
   }, [history]);
 
@@ -70,21 +106,44 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader icon={CalendarCheck} title="Calendar" subtitle="Your dose history, day by day." />
 
-      {/* Calendar (full width) */}
       <FadeItem>
         <Card>
+          <Card.Header>
+            <Card.Title className="flex items-center gap-2">
+              <CalendarRange className="size-4 text-gray-500" /> Last 2 weeks
+            </Card.Title>
+            <Card.Description>Each tile is a day — color shows how many doses you took.</Card.Description>
+          </Card.Header>
           <Card.Content>
-            <div className="mx-auto flex max-w-2xl flex-col items-center gap-4">
-              <HeroCalendar aria-label="Dose history" isReadOnly className="w-full text-base">
+            <TwoWeekStrip history={history} />
+            <div className="mt-4 flex flex-wrap justify-center gap-4">
+              {LEGEND.map((l) => (
+                <span key={l.label} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span className={`size-2.5 rounded-full ${l.cls}`} /> {l.label}
+                </span>
+              ))}
+            </div>
+          </Card.Content>
+        </Card>
+      </FadeItem>
+
+      <FadeItem>
+        <Card>
+          <Card.Header>
+            <Card.Title>Browse history</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="flex flex-col items-center gap-4">
+              <HeroCalendar aria-label="Dose history" isReadOnly className="text-base">
                 <HeroCalendar.Header>
                   <HeroCalendar.NavButton slot="previous" />
                   <HeroCalendar.Heading />
                   <HeroCalendar.NavButton slot="next" />
                 </HeroCalendar.Header>
-                <HeroCalendar.Grid className="w-full">
+                <HeroCalendar.Grid>
                   <HeroCalendar.GridHeader>
                     {(day) => (
                       <HeroCalendar.HeaderCell className="pb-2 text-sm font-medium text-gray-500">
@@ -102,9 +161,7 @@ export default function CalendarPage() {
                             <span className="relative flex size-11 items-center justify-center rounded-xl text-sm transition-colors hover:bg-gray-100 md:size-14 md:text-base">
                               {formattedDate}
                               {state !== "none" && (
-                                <span
-                                  className={`absolute bottom-1.5 size-1.5 rounded-full ${DOT[state]} md:size-2`}
-                                />
+                                <span className={`absolute bottom-1.5 size-1.5 rounded-full ${DOT[state]} md:size-2`} />
                               )}
                             </span>
                           )}
@@ -114,20 +171,11 @@ export default function CalendarPage() {
                   </HeroCalendar.GridBody>
                 </HeroCalendar.Grid>
               </HeroCalendar>
-
-              <div className="flex flex-wrap justify-center gap-4">
-                {LEGEND.map((l) => (
-                  <span key={l.label} className="flex items-center gap-1.5 text-sm text-gray-600">
-                    <span className={`size-2.5 rounded-full ${l.cls}`} /> {l.label}
-                  </span>
-                ))}
-              </div>
             </div>
           </Card.Content>
         </Card>
       </FadeItem>
 
-      {/* Bottom: doses taken, tracked days, weekly adherence */}
       <div className="grid grid-cols-2 gap-4">
         <Stat icon={CheckCheck} label="Doses taken (90d)" value={stats.totalTaken} />
         <Stat icon={CalendarCheck} label="Tracked days" value={stats.trackedDays} />

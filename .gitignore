@@ -16,6 +16,9 @@ dist/
 # OS
 .DS_Store
 
+# Local scratch
+bugs/
+
 # SQLite (generated at runtime — never commit)
 *.db
 *.db-shm
