@@ -8,6 +8,36 @@ The whole thing started because keeping a parent's prescriptions straight is
 harder than it should be, and "is it safe to take these two together?" is a
 question you shouldn't have to google at 11pm.
 
+## Live demo
+
+A preview instance is live at **https://cartridge-served-discounts-specific.trycloudflare.com**
+
+Log in with the demo account:
+
+| email | password |
+|-------|----------|
+| `darshjainji431@gmail.com` | `darshjain` |
+
+It's served over HTTPS and works on both IPv4 and IPv6. The link is a temporary
+preview tunnel, so it can change — grab the current one if it stops responding.
+
+📹 **Walkthrough (~30s):** [docs/demo.mp4](docs/demo.mp4)
+
+## Screenshots
+
+![Login](docs/screenshots/login.png)
+
+And once you're in:
+
+| | |
+|---|---|
+| **Dashboard** — interactions at a glance | **Today** — per-slot dose tracking |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Today](docs/screenshots/today.png) |
+| **Medications** | **Scan history** |
+| ![Medications](docs/screenshots/medications.png) | ![Scan history](docs/screenshots/scans.png) |
+| **Calendar** | **Profile** |
+| ![Calendar](docs/screenshots/calendar.png) | ![Profile](docs/screenshots/profile.png) |
+
 ## What it does
 
 - **Scan a label.** Take or upload a photo and OCR pulls the text off it. We

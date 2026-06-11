@@ -1,0 +1,11 @@
+doseguard.dino.icu {
+	encode gzip
+	handle_path /api/* {
+		reverse_proxy localhost:8000
+	}
+	handle {
+		root * /root/DoseGuard/packages/web/dist
+		try_files {path} /index.html
+		file_server
+	}
+}
